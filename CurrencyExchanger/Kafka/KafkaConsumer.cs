@@ -1,9 +1,12 @@
 ﻿using Confluent.Kafka;
+using CurrencyExchanger.Wrapper.Contracts;
 
 namespace CurrencyExchanger.Kafka
 {
     public class KafkaConsumer : BackgroundService
     {
+        private readonly char _separator = ':';
+
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
         {
             return Task.Run(() =>
@@ -14,6 +17,8 @@ namespace CurrencyExchanger.Kafka
 
         public async Task ConsumeAsync(string topic, CancellationToken stoppingToken)
         {
+            var wrapper = new FixerAPIWrapper();
+
             var config = new ConsumerConfig
             {
                 GroupId = "fintrackConvertResponse",
@@ -32,6 +37,9 @@ namespace CurrencyExchanger.Kafka
             {
                 var consumerResult = consumer.Consume(stoppingToken);
 
+                var array = consumerResult.Value.Split(_separator);
+                var valueResult = await wrapper.ConvertCurrency(array[0], array[1], array[2]);
+                Console.WriteLine($"valueResult = {valueResult}");
 
                 var resultValue = consumerResult.Message.Value;
                 var resultKey = consumerResult.Message.Key;
@@ -39,7 +47,7 @@ namespace CurrencyExchanger.Kafka
                 await _producer.ProduceAsync("fintrack-topic", new Message<string, string>
                 {
                     Key = DateTime.Now.ToString(),
-                    Value = resultValue + "_" +count++.ToString()
+                    Value = valueResult.ToString()
                 });
             }
 
